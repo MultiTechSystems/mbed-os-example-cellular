@@ -94,7 +94,7 @@ void print_function(const char *format, ...)
 void dot_event()
 {
     while (true) {
-        ThisThread::sleep_for(4000);
+        ThisThread::sleep_for(4s);
         if (iface && iface->get_connection_status() == NSAPI_STATUS_GLOBAL_UP) {
             break;
         } else {
@@ -282,6 +282,16 @@ void rtc_bkup_read_sleep_cycle() {
     }
 }
 
+LowPowerTimeout reset_timeout;
+
+void reset_mtqn()
+{
+    uint32_t reset_count = RTC_ReadBackupRegister(RTC_BKP_DR2);
+    RTC_WriteBackupRegister(RTC_BKP_DR2, ++reset_count);
+    device->soft_power_off();
+    NVIC_SystemReset();
+}
+
 int main()
 {
     print_function("\n\nmbed-os-example-cellular\n");
@@ -315,10 +325,14 @@ int main()
 
     nsapi_error_t retcode = NSAPI_ERROR_NO_CONNECTION;
 
+    //reset if no connect and transfer within 5 minutes.
+    reset_timeout.attach(&reset_mtqn, 360s);
     /* Attempt to connect to a cellular network */
     if (do_connect() == NSAPI_ERROR_OK) {
         retcode = test_send_recv();
     }
+    // stop reset
+    reset_timeout.detach();
 
     if (iface->disconnect() != NSAPI_ERROR_OK) {
         print_function("\n\n disconnect failed.\n\n");

@@ -29,6 +29,7 @@
 #define RETRY_COUNT 3
 
 NetworkInterface *iface;
+CellularDevice *device;
 
 // Echo server hostname
 const char *host_name = MBED_CONF_APP_ECHO_SERVER_HOSTNAME;
@@ -235,6 +236,52 @@ nsapi_error_t test_send_recv()
     return -1;
 }
 
+uint32_t RTC_ReadBackupRegister(uint32_t RTC_BKP_DR) {
+    __IO uint32_t
+    tmp = 0;
+
+    // Check the parameters
+    assert_param(IS_RTC_BKP(RTC_BKP_DR));
+    tmp = RTC_BASE + 0x50;
+    tmp += (RTC_BKP_DR * 4);
+    // Read the specified register
+    return (*(__IO uint32_t *) tmp);
+}
+
+void RTC_WriteBackupRegister(uint32_t RTC_BKP_DR, uint32_t Data) {
+    __IO uint32_t
+    tmp = 0;
+
+    // Check the parameters/
+    assert_param(IS_RTC_BKP(RTC_BKP_DR));
+    tmp = RTC_BASE + 0x50;
+    tmp += (RTC_BKP_DR * 4);
+    // Write the specified register/
+    *(__IO uint32_t *) tmp = (uint32_t) Data;
+}
+
+void rtc_bkup_read_sleep_cycle() {
+    __HAL_RCC_PWR_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
+    uint32_t sleep_time = RTC_ReadBackupRegister(RTC_BKP_DR0);
+    uint32_t cycle_count = RTC_ReadBackupRegister(RTC_BKP_DR1);
+    printf("\nCycle = %lu\r\n", ++cycle_count);
+    printf("MTQN reset count = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR2));
+
+    RTC_WriteBackupRegister(RTC_BKP_DR0, 0);
+    if (sleep_time){
+        printf("Sleep for %lu seconds\r\n\n", sleep_time);
+        //mtqn_save_gpio_state();
+        //mtqn_float_pins();
+        ThisThread::sleep_for(sleep_time *1s);
+        //mtqn_restore_gpio_state();
+        RTC_WriteBackupRegister(RTC_BKP_DR1, cycle_count);
+    } else {
+        printf("Sleep time = 0\r\n\n");
+        RTC_WriteBackupRegister(RTC_BKP_DR1, 0);
+    }
+}
+
 int main()
 {
     print_function("\n\nmbed-os-example-cellular\n");
@@ -242,6 +289,8 @@ int main()
 #ifdef MBED_CONF_NSAPI_DEFAULT_CELLULAR_PLMN
     print_function("\n\n[MAIN], plmn: %s\n", (MBED_CONF_NSAPI_DEFAULT_CELLULAR_PLMN ? MBED_CONF_NSAPI_DEFAULT_CELLULAR_PLMN : "NULL"));
 #endif
+
+    rtc_bkup_read_sleep_cycle();
 
     print_function("Establishing connection\n");
 #if MBED_CONF_MBED_TRACE_ENABLE
@@ -257,6 +306,9 @@ int main()
 #endif
 
     MBED_ASSERT(iface);
+
+    device = CellularDevice::get_target_default_instance();
+    MBED_ASSERT(device);
 
     // sim pin, apn, credentials and possible plmn are taken automatically from json when using NetworkInterface::set_default_parameters()
     iface->set_default_parameters();
@@ -278,6 +330,15 @@ int main()
         print_function("\n\nFailure. Exiting \n\n");
     }
 
+    print_function("\n\nRadio soft power off.\n\n");
+    device->shutdown();
+    device->soft_power_off();
+    print_function("\n\nSoft power off complete\n\n");
+
+// Set sleep time to 5s.
+    RTC_WriteBackupRegister(RTC_BKP_DR0, 10);
+    NVIC_SystemReset();
+    
 #if MBED_CONF_MBED_TRACE_ENABLE
     trace_close();
 #else

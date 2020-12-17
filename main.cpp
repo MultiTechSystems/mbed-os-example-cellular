@@ -266,8 +266,9 @@ void rtc_bkup_read_sleep_cycle() {
     uint32_t sleep_time = RTC_ReadBackupRegister(RTC_BKP_DR0);
     uint32_t cycle_count = RTC_ReadBackupRegister(RTC_BKP_DR1);
     printf("\nCycle = %lu\r\n", ++cycle_count);
-    printf("MTQN reset count = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR2));
-
+    printf("Connect timeout resets = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR2));
+    printf("Crash recovery count = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR3));
+    
     RTC_WriteBackupRegister(RTC_BKP_DR0, 0);
     if (sleep_time){
         printf("Sleep for %lu seconds\r\n\n", sleep_time);
@@ -284,10 +285,10 @@ void rtc_bkup_read_sleep_cycle() {
 
 LowPowerTimeout reset_timeout;
 
-void reset_mtqn()
+void connect_timeout_reset()
 {
-    uint32_t reset_count = RTC_ReadBackupRegister(RTC_BKP_DR2);
-    RTC_WriteBackupRegister(RTC_BKP_DR2, ++reset_count);
+    uint32_t connect_reset_count = RTC_ReadBackupRegister(RTC_BKP_DR2);
+    RTC_WriteBackupRegister(RTC_BKP_DR2, ++connect_reset_count);
     device->soft_power_off();
     //NVIC_SystemReset();
     system_reset();
@@ -296,6 +297,8 @@ void reset_mtqn()
 // Application callback function for reporting error context during boot up.
 void mbed_error_reboot_callback(mbed_error_ctx *error_context)
 {
+    uint32_t crash_recovery_count = RTC_ReadBackupRegister(RTC_BKP_DR3);
+    RTC_WriteBackupRegister(RTC_BKP_DR3, ++crash_recovery_count);
     mbed_error_status_t err_status = error_context->error_status;
     printf("\n\n(before main) mbed_error_reboot_callback invoked with the following error context:\n");
     printf("    Status      : 0x%lX\n", (uint32_t)error_context->error_status);
@@ -344,7 +347,7 @@ int main()
     nsapi_error_t retcode = NSAPI_ERROR_NO_CONNECTION;
 
     //reset if no connect and transfer within 5 minutes.
-    reset_timeout.attach(&reset_mtqn, 360s);
+    reset_timeout.attach(&connect_timeout_reset, 360s);
     /* Attempt to connect to a cellular network */
     if (do_connect() == NSAPI_ERROR_OK) {
         retcode = test_send_recv();

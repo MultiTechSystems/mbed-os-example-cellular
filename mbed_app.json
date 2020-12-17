@@ -14,7 +14,10 @@
             "macro_name": "MBED_TRACE_MAX_LEVEL",
             "value": "TRACE_LEVEL_DEBUG"
         }
-  },
+    },
+    "macros": [
+        "MBED_TICKLESS=1"
+    ],
     "target_overrides": {
         "*": {
             "target.network-default-interface-type": "CELLULAR",
@@ -37,7 +40,7 @@
             "nsapi.default-cellular-apn":  "\"vzwinternet\"",
             "nsapi.default-cellular-username": null,
             "nsapi.default-cellular-password": null,
-            "ppp.thread-stacksize": 1280
+            "ppp.thread-stacksize": 816
         },
         "DISCO_L496AG": {
             "target.macros_add": [

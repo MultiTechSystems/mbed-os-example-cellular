@@ -289,11 +289,29 @@ void reset_mtqn()
     uint32_t reset_count = RTC_ReadBackupRegister(RTC_BKP_DR2);
     RTC_WriteBackupRegister(RTC_BKP_DR2, ++reset_count);
     device->soft_power_off();
-    NVIC_SystemReset();
+    //NVIC_SystemReset();
+    system_reset();
+}
+
+// Application callback function for reporting error context during boot up.
+void mbed_error_reboot_callback(mbed_error_ctx *error_context)
+{
+    mbed_error_status_t err_status = error_context->error_status;
+    printf("\n\n(before main) mbed_error_reboot_callback invoked with the following error context:\n");
+    printf("    Status      : 0x%lX\n", (uint32_t)error_context->error_status);
+    printf("    Value       : 0x%lX\n", (uint32_t)error_context->error_value);
+    printf("    Address     : 0x%lX\n", (uint32_t)error_context->error_address);
+    printf("    Reboot count: 0x%lX\n", (uint32_t)error_context->error_reboot_count);
+    printf("    CRC         : 0x%lX\n", (uint32_t)error_context->crc_error_ctx);
+    mbed_reset_reboot_error_info();
+    mbed_reset_reboot_count();
 }
 
 int main()
 {
+    // Required for deepsleep.
+    mbed_file_handle(STDIN_FILENO)->enable_input(false);
+
     print_function("\n\nmbed-os-example-cellular\n");
     print_function("\n\nBuilt: %s, %s\n", __DATE__, __TIME__);
 #ifdef MBED_CONF_NSAPI_DEFAULT_CELLULAR_PLMN
@@ -351,8 +369,9 @@ int main()
 
 // Set sleep time to 5s.
     RTC_WriteBackupRegister(RTC_BKP_DR0, 10);
-    NVIC_SystemReset();
-    
+    //NVIC_SystemReset();
+    system_reset();
+
 #if MBED_CONF_MBED_TRACE_ENABLE
     trace_close();
 #else

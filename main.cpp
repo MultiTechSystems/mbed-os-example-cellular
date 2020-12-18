@@ -263,23 +263,34 @@ void RTC_WriteBackupRegister(uint32_t RTC_BKP_DR, uint32_t Data) {
 void rtc_bkup_read_sleep_cycle() {
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
+
+    // Brief sleep to catch prints on power up.
+    ThisThread::sleep_for(1s);
+
     uint32_t sleep_time = RTC_ReadBackupRegister(RTC_BKP_DR0);
-    uint32_t cycle_count = RTC_ReadBackupRegister(RTC_BKP_DR1);
-    printf("\nCycle = %lu\r\n", ++cycle_count);
-    printf("Connect timeout resets = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR2));
-    printf("Crash recovery count = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR3));
-    
     RTC_WriteBackupRegister(RTC_BKP_DR0, 0);
+    uint32_t cycle_count;
     if (sleep_time){
-        printf("Sleep for %lu seconds\r\n\n", sleep_time);
+        cycle_count = RTC_ReadBackupRegister(RTC_BKP_DR1);
+    } else {
+        cycle_count = 1;
+    }
+    printf("\nCycles since reset %lu\r\n", cycle_count++);
+    RTC_WriteBackupRegister(RTC_BKP_DR1, cycle_count);
+
+    uint32_t total_cycle_count = RTC_ReadBackupRegister(RTC_BKP_DR2);
+    printf("Cycle since power on %lu\r\n", ++total_cycle_count);
+    RTC_WriteBackupRegister(RTC_BKP_DR2, total_cycle_count);
+
+    printf("Connect timeout resets = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR4));
+    printf("Crash recovery count = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR3));
+
+    printf("Sleep for %lu seconds\r\n", sleep_time);
+    if (sleep_time){
         //mtqn_save_gpio_state();
         //mtqn_float_pins();
         ThisThread::sleep_for(sleep_time *1s);
         //mtqn_restore_gpio_state();
-        RTC_WriteBackupRegister(RTC_BKP_DR1, cycle_count);
-    } else {
-        printf("Sleep time = 0\r\n\n");
-        RTC_WriteBackupRegister(RTC_BKP_DR1, 0);
     }
 }
 
@@ -287,8 +298,8 @@ LowPowerTimeout reset_timeout;
 
 void connect_timeout_reset()
 {
-    uint32_t connect_reset_count = RTC_ReadBackupRegister(RTC_BKP_DR2);
-    RTC_WriteBackupRegister(RTC_BKP_DR2, ++connect_reset_count);
+    uint32_t connect_reset_count = RTC_ReadBackupRegister(RTC_BKP_DR4);
+    RTC_WriteBackupRegister(RTC_BKP_DR4, ++connect_reset_count);
     device->soft_power_off();
     //NVIC_SystemReset();
     system_reset();
@@ -315,13 +326,13 @@ int main()
     // Required for deepsleep.
     mbed_file_handle(STDIN_FILENO)->enable_input(false);
 
+    rtc_bkup_read_sleep_cycle();
+
     print_function("\n\nmbed-os-example-cellular\n");
     print_function("\n\nBuilt: %s, %s\n", __DATE__, __TIME__);
 #ifdef MBED_CONF_NSAPI_DEFAULT_CELLULAR_PLMN
     print_function("\n\n[MAIN], plmn: %s\n", (MBED_CONF_NSAPI_DEFAULT_CELLULAR_PLMN ? MBED_CONF_NSAPI_DEFAULT_CELLULAR_PLMN : "NULL"));
 #endif
-
-    rtc_bkup_read_sleep_cycle();
 
     print_function("Establishing connection\n");
 #if MBED_CONF_MBED_TRACE_ENABLE

@@ -39,8 +39,7 @@
             "nsapi.default-cellular-plmn": null,
             "nsapi.default-cellular-apn":  "\"vzwinternet\"",
             "nsapi.default-cellular-username": null,
-            "nsapi.default-cellular-password": null,
-            "ppp.thread-stacksize": 816
+            "nsapi.default-cellular-password": null
         },
         "DISCO_L496AG": {
             "target.macros_add": [

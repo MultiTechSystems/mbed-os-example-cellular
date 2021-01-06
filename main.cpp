@@ -279,11 +279,12 @@ void rtc_bkup_read_sleep_cycle() {
     RTC_WriteBackupRegister(RTC_BKP_DR1, cycle_count);
 
     uint32_t total_cycle_count = RTC_ReadBackupRegister(RTC_BKP_DR2);
-    printf("Cycle since power on %lu\r\n", ++total_cycle_count);
+    printf("Cycles since power on %lu\r\n", ++total_cycle_count);
     RTC_WriteBackupRegister(RTC_BKP_DR2, total_cycle_count);
 
     printf("Connect timeout resets = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR4));
-    printf("Crash recovery count = %lu\r\n", RTC_ReadBackupRegister(RTC_BKP_DR3));
+    // Crash recovery increments on timeouts too. Subtract the timeouts for reporting.
+    printf("Crash recovery count = %lu\r\n", (RTC_ReadBackupRegister(RTC_BKP_DR3)-RTC_ReadBackupRegister(RTC_BKP_DR4)));
 
     printf("Sleep for %lu seconds\r\n", sleep_time);
     if (sleep_time){
@@ -301,7 +302,6 @@ void connect_timeout_reset()
     uint32_t connect_reset_count = RTC_ReadBackupRegister(RTC_BKP_DR4);
     RTC_WriteBackupRegister(RTC_BKP_DR4, ++connect_reset_count);
     device->soft_power_off();
-    //NVIC_SystemReset();
     system_reset();
 }
 
@@ -310,7 +310,6 @@ void mbed_error_reboot_callback(mbed_error_ctx *error_context)
 {
     uint32_t crash_recovery_count = RTC_ReadBackupRegister(RTC_BKP_DR3);
     RTC_WriteBackupRegister(RTC_BKP_DR3, ++crash_recovery_count);
-    mbed_error_status_t err_status = error_context->error_status;
     printf("\n\n(before main) mbed_error_reboot_callback invoked with the following error context:\n");
     printf("    Status      : 0x%lX\n", (uint32_t)error_context->error_status);
     printf("    Value       : 0x%lX\n", (uint32_t)error_context->error_value);
@@ -323,7 +322,7 @@ void mbed_error_reboot_callback(mbed_error_ctx *error_context)
 
 int main()
 {
-    // Required for deepsleep.
+    // Required for low power in deepsleep.
     mbed_file_handle(STDIN_FILENO)->enable_input(false);
 
     rtc_bkup_read_sleep_cycle();
@@ -358,7 +357,7 @@ int main()
     nsapi_error_t retcode = NSAPI_ERROR_NO_CONNECTION;
 
     //reset if no connect and transfer within 5 minutes.
-    reset_timeout.attach(&connect_timeout_reset, 360s);
+    reset_timeout.attach(&connect_timeout_reset, 300s);
     /* Attempt to connect to a cellular network */
     if (do_connect() == NSAPI_ERROR_OK) {
         retcode = test_send_recv();
@@ -377,13 +376,11 @@ int main()
     }
 
     print_function("\n\nRadio soft power off.\n\n");
-    device->shutdown();
     device->soft_power_off();
     print_function("\n\nSoft power off complete\n\n");
 
-// Set sleep time to 5s.
+    // Set sleep time to 10s.
     RTC_WriteBackupRegister(RTC_BKP_DR0, 10);
-    //NVIC_SystemReset();
     system_reset();
 
 #if MBED_CONF_MBED_TRACE_ENABLE

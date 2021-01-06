@@ -13,6 +13,10 @@ The program uses a [cellular modem driver](https://github.com/ARMmbed/mbed-os/tr
 
 After registration, the driver opens a point-to-point protocol (PPP) pipe using LWIP with the cellular modem and connects to internet. This driver currently supports UART data connection type only between your cellular modem and MCU.
 
+The application repeats and sleeps using the RTC backup registers to log statistics and pass the sleep time. Sleep is performed before a connection is made so that lowest power during sleep can be achieved.
+
+Automatic reboot on crash has been implemented and is counted in statistics. Requires mbed-os version 6.6.0 or later.
+
 For more information on Arm Mbed OS cellular APIs and porting guide, please visit the [Mbed OS cellular API](https://os.mbed.com/docs/latest/reference/cellular.html) and [contributing documentation](https://os.mbed.com/docs/mbed-os/latest/contributing/index.html).
 
 ### Download the application
@@ -20,11 +24,13 @@ For more information on Arm Mbed OS cellular APIs and porting guide, please visi
 ```sh
 $ mbed import mbed-os-example-cellular
 $ cd mbed-os-example-cellular
+$ mbed deploy
 
 #OR
 
 $ git clone git@github.com:ARMmbed/mbed-os-example-cellular.git
 $ cd mbed-os-example-cellular
+$ mbed deploy
 ```
 
 ### Change the network and SIM credentials
@@ -35,6 +41,7 @@ See the file `mbed_app.json` in the root directory of your application. This fil
     "target_overrides": {
         "*": {
             "nsapi.default-cellular-sim-pin": "\"1234\"",
+            "nsapi.default-cellular-apn":  "\"vzwinternet\"",
 ```
 
 ### Selecting socket type (TCP, UDP or NONIP)
@@ -156,4 +163,3 @@ If you have problems to get started with debugging, you can review the [document
 The software is provided under Apache-2.0 license. Contributions to this project are accepted under the same license. Please see [contributing.md](CONTRIBUTING.md) for more info.
 
 This project contains code from other projects. The original license text is included in those source files. They must comply with our license guide.
-
